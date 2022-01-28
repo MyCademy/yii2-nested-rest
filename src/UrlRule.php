@@ -5,7 +5,7 @@
  * @license http://opensource.org/licenses/BSD-3-Clause
  */
 
-namespace tunecino\nestedrest;
+namespace mycademy\nestedrest;
 
 use Yii;
 use yii\web\UrlRuleInterface;
@@ -63,7 +63,7 @@ class UrlRule extends BaseObject implements UrlRuleInterface
      *
      * [
      *       // Nested Rules Brand
-     *      'class' => 'tunecino\nestedrest\UrlRule',
+     *      'class' => 'mycademy\nestedrest\UrlRule',
      *      'modelClass' => 'app\modules\v1\models\Brand',
      *      'modulePrefix' => 'v1',
      *      'resourceName' => 'v1/brands',
