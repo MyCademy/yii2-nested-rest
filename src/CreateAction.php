@@ -5,7 +5,7 @@
  * @license http://opensource.org/licenses/BSD-3-Clause
  */
 
-namespace tunecino\nestedrest;
+namespace mycademy\nestedrest;
 
 use Yii;
 use yii\base\Model;
