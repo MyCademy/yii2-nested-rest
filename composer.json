@@ -1,5 +1,5 @@
 {
-    "name": "tunecino/yii2-nested-rest",
+    "name": "mycademy/yii2-nested-rest",
     "type": "yii2-extension",
     "description": "Adds nested resources routing support along with related actions and relationship handlers to the Yii RESTful API framework",
     "keywords": [
