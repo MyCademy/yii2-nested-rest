@@ -30,5 +30,6 @@
         "psr-4": {
             "tunecino\\nestedrest\\": "src"
         }
-    }
+    },
+    "version": "0.5.1"
 }
