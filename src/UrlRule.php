@@ -8,6 +8,7 @@
 namespace mycademy\nestedrest;
 
 use Yii;
+use yii\web\CompositeUrlRule;
 use yii\web\UrlRuleInterface;
 use yii\base\BaseObject;
 use yii\helpers\Inflector;
@@ -18,8 +19,16 @@ use yii\base\InvalidConfigException;
  * UrlRule is a custom implementation that creates multi instances of a UrlRuleInterface[] to generate nested rules based in model relations.
  * @author Salem Ouerdani <tunecino@gmail.com>
  */
-class UrlRule extends BaseObject implements UrlRuleInterface
+class UrlRule extends CompositeUrlRule
 {
+    /**
+     * @var array the rules contained within this composite rule. Please refer to [[UrlManager::rules]]
+     * for the format of this property.
+     * @see prefix
+     * @see routePrefix
+     */
+    public $rules = [];
+
     /**
      * @var string class name of the model which will be used to generate related rules.
      * The model class must implement [[ActiveRecordInterface]].
@@ -117,7 +126,7 @@ class UrlRule extends BaseObject implements UrlRuleInterface
      * @var array the default configuration for creating each collection of URL rules related to a model relation.
      */
     private $config = [
-        'class' => 'yii\rest\UrlRule'
+        'class' => 'mycademy\\nestedrest\\NestedRelationUrlRule'
     ];
 
     private $_rulesFactory;
@@ -154,7 +163,6 @@ class UrlRule extends BaseObject implements UrlRuleInterface
      */
     public function init()
     {
-        parent::init();
         if (empty($this->modelClass)) {
             throw new InvalidConfigException('"modelClass" must be set.');
         }
@@ -174,7 +182,61 @@ class UrlRule extends BaseObject implements UrlRuleInterface
         if (!empty($this->extraPatterns)) {
             $this->config['extraPatterns'] = $this->extraPatterns;
         }
+
+        parent::init();
     }
+
+    protected function createRules()
+    {
+        $modelName = Inflector::camel2id(StringHelper::basename($this->modelClass));
+
+        if (isset($this->resourceName)) {
+            $resourceName = $this->resourceName;
+        } else {
+            $resourceName = $this->pluralize ? Inflector::pluralize($modelName) : $modelName;
+        }
+
+        $link_attribute = isset($this->linkAttribute) ? $this->linkAttribute : $modelName . '_id';
+        $this->config['prefix'] = $resourceName . '/<' . $link_attribute . ':' . $this->linkAttributePattern . '>';
+
+        $allRelationsConfig = $this->config;
+        $rules = [];
+        foreach ($this->relations as $key => $value) {
+            if (is_int($key)) {
+                $relation = $value;
+                $urlName = $this->pluralize ? Inflector::camel2id(Inflector::pluralize($relation)) : Inflector::camel2id($relation);
+                $controller = Inflector::camel2id(Inflector::singularize($relation));
+            } else {
+                $relation = $key;
+                if (is_array($value)) {
+                    [$urlName, $controller] = [key($value), current($value)];
+                } else {
+                    $urlName = $this->pluralize ? Inflector::camel2id(Inflector::pluralize($relation)) : Inflector::camel2id($relation);
+                    $controller = $value;
+                }
+            }
+
+            if (YII_DEBUG) {
+                (new $this->modelClass)->getRelation($relation);
+            }
+
+            $modulePrefix = isset($this->modulePrefix) ? $this->modulePrefix . '/' : '';
+            $config = $this->config;
+            $config['controller'][$urlName] = $modulePrefix . $controller;
+            $config['relation'] = $relation;
+            $config['link_attribute'] = $link_attribute;
+
+            $allRelationsConfig['controller'][$urlName] = $modulePrefix . $controller;
+
+            /** @var \yii\rest\UrlRule $urlRule */
+            $rules[] = Yii::createObject($config);
+        }
+
+        $this->setRulesFactory($allRelationsConfig);
+
+        return $rules;
+    }
+
 
     /**
      * @inheritdoc
@@ -193,55 +255,18 @@ class UrlRule extends BaseObject implements UrlRuleInterface
      */
     public function parseRequest($manager, $request)
     {
-        $modelName = Inflector::camel2id(StringHelper::basename($this->modelClass));
+        foreach ($this->rules as $rule) {
+            /** @var NestedRelationUrlRule $rule */
 
-        if (isset($this->resourceName)) {
-            $resourceName = $this->resourceName;
-        } else {
-            $resourceName = $this->pluralize ? Inflector::pluralize($modelName) : $modelName;
-        }
+            $result = $rule->parseRequest($manager, $request);
 
-        $link_attribute = isset($this->linkAttribute) ? $this->linkAttribute : $modelName . '_id';
-        $this->config['prefix'] = $resourceName . '/<' . $link_attribute . ':' . $this->linkAttributePattern . '>';
-
-        $allRelationsConfig = $this->config;
-        foreach ($this->relations as $key => $value) {
-            if (is_int($key)) {
-                $relation = $value;
-                $urlName = $this->pluralize ? Inflector::camel2id(Inflector::pluralize($relation)) : Inflector::camel2id($relation);
-                $controller = Inflector::camel2id(Inflector::singularize($relation));
-            } else {
-                $relation = $key;
-                if (is_array($value)) {
-                    list($urlName, $controller) = [key($value), current($value)];
-                } else {
-                    $urlName = $this->pluralize ? Inflector::camel2id(Inflector::pluralize($relation)) : Inflector::camel2id($relation);
-                    $controller = $value;
-                }
-            }
-
-            if (YII_DEBUG) {
-                (new $this->modelClass)->getRelation($relation);
-            }
-
-            $modulePrefix = isset($this->modulePrefix) ? $this->modulePrefix . '/' : '';
-            $config = $this->config;
-            $config['controller'][$urlName] = $modulePrefix . $controller;
-            $allRelationsConfig['controller'][$urlName] = $modulePrefix . $controller;
-
-            /** @var \yii\rest\UrlRule $urlRule */
-            $urlRule = Yii::createObject($config);
-            $routeObj = $urlRule->parseRequest($manager, $request);
-
-            if ($routeObj) {
-                $routeObj[1]['relativeClass'] = $this->modelClass;
-                $routeObj[1]['relationName'] = $relation;
-                $routeObj[1]['linkAttribute'] = $link_attribute;
-                return $routeObj;
+            if ($result !== false) {
+                $result[1]['relativeClass'] = $this->modelClass;
+                $result[1]['relationName'] = $rule->relation;
+                $result[1]['linkAttribute'] = $rule->link_attribute;
+                return $result;
             }
         }
-
-        $this->setRulesFactory($allRelationsConfig);
 
         return false;
     }
