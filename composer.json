@@ -23,6 +23,12 @@
             "email": "tunecino@gmail.com"
         }
     ],
+    "repositories": [
+        {
+            "type": "composer",
+            "url": "https://asset-packagist.org"
+        }
+    ],
     "require": {
         "yiisoft/yii2": "~2.0.13"
     },
@@ -31,5 +37,9 @@
             "mycademy\\nestedrest\\": "src"
         }
     },
-    "version": "0.5.1"
+    "config": {
+        "allow-plugins": {
+            "yiisoft/yii2-composer": true
+        }
+    }
 }
