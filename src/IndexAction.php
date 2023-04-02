@@ -9,6 +9,8 @@ namespace mycademy\nestedrest;
 
 use Yii;
 use yii\data\ActiveDataProvider;
+use yii\db\ActiveQuery;
+use yii\db\ActiveRecord;
 
 /**
  * @author Salem Ouerdani <tunecino@gmail.com>
@@ -26,11 +28,43 @@ class IndexAction extends Action
             call_user_func($this->checkAccess, $this->id);
         }
 
-        $relModel = $this->getRelativeModel();
-        $getter = 'get' . $this->relationName;
-
         return new ActiveDataProvider([
-            'query' => $relModel->$getter(),
+            'query' => $this->buildQuery(),
         ]);
+    }
+
+    /**
+     * @return ActiveQuery
+     */
+    protected function buildQuery()
+    {
+        $relModel = $this->getRelativeModel();
+        $getter = 'get' . ucfirst($this->relationName);
+
+        /** @var ActiveQuery $query */
+        $query = $relModel->$getter();
+
+        // Clear 'via' relation data and build inner join condition for performance
+        // (otherwise yii will filter the results by selecting all junction tabel models).
+        /* @var string $viaName  */
+        /* @var ActiveQuery $viaQuery */
+        /* @var bool $viaCallableUsed */
+        /* @var ActiveRecord $primaryModel */
+        [$viaName, $viaQuery, $viaCallableUsed] = $query->via;
+        $primaryModel = $query->primaryModel;
+
+        $query->primaryModel = null;
+        $query->via = null;
+
+        $query->innerJoinWith([$viaName => function($junctionQuery) use ($viaQuery) {
+            $condition = [];
+            foreach ($viaQuery->link as $column => $primaryColumn) {
+                $condition[$column] = $viaQuery->primaryModel->getAttribute($primaryColumn);
+            }
+            /** @var ActiveQuery $junctionQuery  */
+            $junctionQuery->andWhere($condition);
+        }], false);
+
+        return $query;
     }
 }
