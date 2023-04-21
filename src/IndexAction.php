@@ -18,7 +18,7 @@ use yii\db\ActiveRecord;
 class IndexAction extends Action
 {
     /**
-     * Prepares the data provider that should return the requested 
+     * Prepares the data provider that should return the requested
      * collection of the models within its related model.
      * @return ActiveDataProvider
      */
@@ -44,26 +44,28 @@ class IndexAction extends Action
         /** @var ActiveQuery $query */
         $query = $relModel->$getter();
 
-        // Clear 'via' relation data and build inner join condition for performance
-        // (otherwise yii will filter the results by selecting all junction tabel models).
-        /* @var string $viaName  */
-        /* @var ActiveQuery $viaQuery */
-        /* @var bool $viaCallableUsed */
-        /* @var ActiveRecord $primaryModel */
-        [$viaName, $viaQuery, $viaCallableUsed] = $query->via;
-        $primaryModel = $query->primaryModel;
+        if ($query->via) {
+            // Clear 'via' relation data and build inner join condition for performance
+            // (otherwise yii will filter the results by selecting all junction tabel models).
+            /* @var string $viaName */
+            /* @var ActiveQuery $viaQuery */
+            /* @var bool $viaCallableUsed */
+            /* @var ActiveRecord $primaryModel */
+            [$viaName, $viaQuery, $viaCallableUsed] = $query->via;
+            $primaryModel = $query->primaryModel;
 
-        $query->primaryModel = null;
-        $query->via = null;
+            $query->primaryModel = null;
+            $query->via = null;
 
-        $query->innerJoinWith([$viaName => function($junctionQuery) use ($viaQuery) {
-            $condition = [];
-            foreach ($viaQuery->link as $column => $primaryColumn) {
-                $condition[$column] = $viaQuery->primaryModel->getAttribute($primaryColumn);
-            }
-            /** @var ActiveQuery $junctionQuery  */
-            $junctionQuery->andWhere($condition);
-        }], false);
+            $query->innerJoinWith([$viaName => function ($junctionQuery) use ($viaQuery) {
+                $condition = [];
+                foreach ($viaQuery->link as $column => $primaryColumn) {
+                    $condition[$column] = $viaQuery->primaryModel->getAttribute($primaryColumn);
+                }
+                /** @var ActiveQuery $junctionQuery */
+                $junctionQuery->andWhere($condition);
+            }], false);
+        }
 
         return $query;
     }
